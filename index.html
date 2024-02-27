@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Cesium.js"></script>
+    <link
+      href="https://cesium.com/downloads/cesiumjs/releases/1.114/Build/Cesium/Widgets/widgets.css"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100vw;
+        height: 100vh;
+        overflow: hidden;
+      }
+
+      #cesiumContainer {
+        width: 100%;
+        height: 100%;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div id="cesiumContainer"></div>
+    <script>
+      // Cesium.Ion.defaultAccessToken = "";
+
+      const viewer = new Cesium.Viewer("cesiumContainer", {
+        homeButton: false,
+        geocoder: false,
+        navigationHelpButton: false,
+        sceneModePicker: false,
+        baseLayerPicker: false,
+        // baseLayer: false,
+        infoBox: false,
+        timeline: false,
+        shadows: false,
+        scene3DOnly: true,
+        resolutionScale: 0.5,
+        fullscreenButton: false,
+        animation: false,
+        selectionIndicator: false,
+      });
+      viewer.scene.screenSpaceCameraController.rotateEventTypes =
+        Cesium.CameraEventType.LEFT_DRAG;
+
+      viewer.scene.screenSpaceCameraController.tiltEventTypes =
+        Cesium.CameraEventType.RIGHT_DRAG;
+
+      viewer.scene.screenSpaceCameraController.zoomEventTypes = [
+        Cesium.CameraEventType.WHEEL,
+        Cesium.CameraEventType.PINCH,
+      ];
+
+      createWorldTerrain();
+
+      const trackSource = new Cesium.CustomDataSource("track");
+
+      viewer.dataSources.add(trackSource);
+
+      fetchData();
+
+      async function createWorldTerrain() {
+        let worldTerrain;
+        try {
+          worldTerrain = await Cesium.createWorldTerrainAsync();
+          viewer.scene.terrainProvider = worldTerrain;
+          // viewer.scene.globe.show = false;
+        } catch (error) {
+          console.error(`There was an error creating world terrain. ${error}`);
+        }
+      }
+
+      function fetchData() {
+        fetch("foo.json")
+          .then((response) => response.json())
+          .then((jsonData) => {
+            const features = [];
+            jsonData.forEach((item) => {
+              getOrCreateEntity(item);
+            });
+            // setTimeout(() => {
+            //   removeOldEntities();
+            // }, 10000);
+            viewer.flyTo(trackSource.entities, {
+              offset: {
+                heading: Cesium.Math.toRadians(0),
+                pitch: Cesium.Math.toRadians(-90),
+                range: 3000,
+              },
+            });
+          })
+          .catch((error) => {
+            console.error("Error loading JSON:", error);
+          });
+      }
+
+      function getOrCreateEntity(item) {
+        let entity = trackSource.entities.getById(item.callsign);
+        if (entity) {
+          const alt = Math.floor(Math.random() * 145) + 1;
+          entity.position = Cesium.Cartesian3.fromDegrees(
+            item.lon,
+            item.lat,
+            alt
+          );
+          entity.label.fillColor = Cesium.Color.WHITE;
+          entity.description = `Callsign: ${entity.id} <br> 📍${item.lat}, ${item.lon} <br>  ${entity.ts}`;
+        } else {
+          entity = trackSource.entities.add({
+            id: item.callsign,
+            description: item.callsign,
+            position: Cesium.Cartesian3.fromDegrees(item.lon, item.lat),
+            billboard: {
+              image: "/images/tracker.png",
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+              scale: 0.5,
+            },
+            label: {
+              text: item.callsign,
+              fillColor: Cesium.Color.LIMEGREEN,
+              font: "bold 12pt Courier",
+              scale: 1,
+              style: Cesium.LabelStyle.FILL,
+              showBackground: true,
+              horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+              verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+              pixelOffset: new Cesium.Cartesian2(0, -24), // Offset label above the position
+              heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+            },
+          });
+        }
+        entity.addProperty("type");
+        entity.type = "f";
+        entity.addProperty("ts");
+        entity.ts = Date.now();
+        // updateCallsignTsArray(entity, Date.now());
+      }
+
+      function removeOldEntities() {
+        const entities = trackSource.entities.values;
+        const entityProps = entities.map((entity) => {
+          return {
+            id: entity.id,
+            ts: entity.ts,
+          };
+        });
+        entityProps.forEach((item) => {
+          const dt = new Date().getTime() - item.ts;
+          if (dt > 5 * 60 * 1000) {
+            trackSource.entities.removeById(item.id);
+          }
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,54 @@
+In reference to the part of: I want 2 scripts using Fetch the first is to query an endpoint, once the JSON is fully returned or loaded,  I want to use the function getOrCreateEntity(id) and add or update the position and label in an entity group or collection. I also want a function to remove an entity that is older than 5 minutes.  
+This is the type of overall function I'm looking for {getOrCreateEntity(id) → Gets an entity with the specified id or creates it and adds it to the collection if it does not exist.} I will have total of 3 groups in the future. This is the first function that I have but its just going into the entities instead of a datasource or entitygroup and needs to go into the "airunits" datasource or entitygroup.
+We also need a small seperate function to remove ones older than 5 minutes.
+
+ function getairunits() {
+      console.log('running');
+      fetch('foo.json')
+        .then(response => response.json())
+        .then(jsonData => {
+            jsonData.forEach(item => {
+                let entity = viewer.entities.getById(item.callsign);
+                if (entity) {
+                    console.log(entity);
+                    const alt = Math.floor(Math.random() * 145) + 1;
+                    entity.position = Cesium.Cartesian3.fromDegrees(item.lon, item.lat, alt);
+                    entity.label.fillColor = Cesium.Color.WHITE;
+                    entity.description = `Callsign: ${entity.id} <br> 📍${item.lat}, ${item.lon} <br>  ${entity.ts}`
+                } else {
+                    entity = viewer.entities.add({
+                        id: item.callsign,
+                        description: item.callsign,
+                        position: Cesium.Cartesian3.fromDegrees(item.lon, item.lat),
+                        label: {
+                            text: item.callsign,
+                            fillColor: Cesium.Color.LIMEGREEN,
+                            font: 'bold 12pt Courier',
+                            scale: 1,
+                            style: Cesium.LabelStyle.FILL,
+                            showBackground: true,
+                            horizontalOrigin: Cesium.HorizontalOrigin.CENTER,
+                            verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+                            pixelOffset: new Cesium.Cartesian2(0, -15) // Offset label above the position
+                        }
+                    });
+                }
+              entity.addProperty('type');
+              entity.type = 'f';
+              entity.addProperty('ts');
+              entity.ts = Date.now();
+              updateCallsignTsArray(entity, Date.now());
+            });
+        })
+        .catch(error => {
+            console.error('Error loading JSON:', error);
+        });
+}
+
+
+
+In reference to the part of: I also want another script for adding CylinderGeometry's for each row returned on a 2nd endpoint, width is a fixed value and height comes from the JSON payload once the function is called and the data is returned it will first clear the current cylinders and add the new ones. This is basically a remove all and all the new ones when called (Would like the JSON to be loaded and ready before removing the old ones so its as seamless as possible);
+
+This is a JSON sample for the 2nd needed function Just use fetch to call the faadof enpoint (https://unmannedar.com/faadof/?lat=36.209604021541935&lon=-88.41383421214985) with where we make the CylinderGraphics and remove all the old ones by the faadof() function. The this should be clamped to ground and have a height matching the "agl" JSON value with a label on top of the Cylinder use the AGL for the label for now. Hardcode the "width" to 15 meters [{"objectid":"447781","agl":315,"lon":-88.4134749455338,"lat":36.2109595513149},{"objectid":"447782","agl":310,"lon":-88.4132277234788,"lat":36.211173440368}]
+
+The main reason is the future ability to show / hide the groups.
